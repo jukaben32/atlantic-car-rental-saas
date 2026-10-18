@@ -9,7 +9,8 @@
  * Temporary file. Creates data prefixed "Smoke Test" and removes it at the end.
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -36,8 +37,57 @@ const env = Object.fromEntries(
 )
 
 const URL = env.VITE_SUPABASE_URL
-const KEY = env.VITE_SUPABASE_ANON_KEY
+const KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY
 const STAMP = Date.now().toString(36)
+
+/*
+ * This suite writes to whichever project it is pointed at: it inserts users
+ * straight into auth.users, creates and deletes agencies, and clears orphaned
+ * GPS secrets from Vault. It must never reach a project by accident, so it runs
+ * only when the operator names the target, and only when that name agrees with
+ * both places the suite takes a project from — the browser URL in .env.local and
+ * the project the CLI is linked to. Point it at a disposable project, never at
+ * one real agencies use.
+ */
+function refuse(reason) {
+  console.error(`Refusing to run the live smoke test: ${reason}`)
+  process.exit(1)
+}
+
+const TARGET_REF = process.env.SMOKE_TARGET_PROJECT_REF?.trim()
+if (!TARGET_REF) {
+  refuse(
+    'set SMOKE_TARGET_PROJECT_REF to the ref of a disposable test project. The suite creates and deletes data there.',
+  )
+}
+let urlRef = null
+try {
+  urlRef = new global.URL(URL).hostname.split('.')[0]
+} catch {
+  refuse('VITE_SUPABASE_URL in .env.local is not a valid URL.')
+}
+const linkedRefPath = 'supabase/.temp/project-ref'
+const linkedRef = existsSync(linkedRefPath) ? readFileSync(linkedRefPath, 'utf8').trim() : null
+if (urlRef !== TARGET_REF) {
+  refuse(`.env.local points at ${urlRef}, not at SMOKE_TARGET_PROJECT_REF (${TARGET_REF}).`)
+}
+if (linkedRef !== TARGET_REF) {
+  refuse(
+    `the Supabase CLI is linked to ${linkedRef ?? 'no project'}, not to SMOKE_TARGET_PROJECT_REF (${TARGET_REF}).`,
+  )
+}
+
+/*
+ * One password per run, shared by every throwaway user this run creates. It is
+ * never printed: anything the suite reports goes through redact() first. A fixed
+ * password in the source would leave every account an aborted run failed to
+ * clean up open to anybody who has read this file.
+ */
+const SMOKE_PASSWORD = `${randomBytes(24).toString('base64url')}Aa1!`
+
+function redact(text) {
+  return String(text).split(SMOKE_PASSWORD).join('<redacted>')
+}
 
 const results = []
 let failures = 0
@@ -48,7 +98,7 @@ async function check(name, fn) {
     results.push({ ok: '✓', name, detail: detail ?? '' })
   } catch (error) {
     failures += 1
-    results.push({ ok: '✗', name, detail: String(error?.message ?? error).slice(0, 120) })
+    results.push({ ok: '✗', name, detail: redact(error?.message ?? error).slice(0, 120) })
   }
 }
 
@@ -90,7 +140,9 @@ function sql(query, attempt = 0) {
       return sql(query, attempt + 1)
     }
     throw new Error(
-      `${text.trim().slice(0, 400) || String(error?.message ?? error)} — while running: ${query.trim().slice(0, 120)}`,
+      redact(
+        `${text.trim().slice(0, 400) || String(error?.message ?? error)} — while running: ${query.trim().slice(0, 120)}`,
+      ),
     )
   }
 }
@@ -133,8 +185,8 @@ const PDF = Buffer.from(
   'utf8',
 )
 
-const agencyA = { email: `smoke-a-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
-const agencyB = { email: `smoke-b-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
+const agencyA = { email: `smoke-a-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
+const agencyB = { email: `smoke-b-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
 
 /**
  * Creates a confirmed user the way a completed sign-up leaves one.
@@ -1117,7 +1169,7 @@ await check('archive and restore a customer', async () => {
 })
 
 await check('role enforcement holds through the API, not just the interface', async () => {
-  const staff = { email: `smoke-staff-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
+  const staff = { email: `smoke-staff-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
   const staffId = seedConfirmedUser(staff, { full_name: 'Smoke Staff' })
 
   sql(
@@ -4011,7 +4063,7 @@ async function finOverview(from, to) {
 await check('an administrator and a manager exist for the financing checks', async () => {
   // Financing view is a manager's; managing it is an administrator's. Both are
   // needed to prove the boundary rather than assume it.
-  const manager = { email: `smoke-fin-mgr-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
+  const manager = { email: `smoke-fin-mgr-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
   finManagerId = seedConfirmedUser(manager, { full_name: 'Smoke Finance Manager' })
   sql(
     `insert into public.organization_members (organization_id, user_id, role, status)
@@ -5504,9 +5556,9 @@ function gpsGeneration() {
 await check('an administrator, a manager and a member of staff exist for tracking', async () => {
   // Tracking splits three ways: staff see nothing, a manager watches the map,
   // an administrator owns the credential. All three are needed to prove it.
-  const admin = { email: `smoke-gps-adm-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
-  const manager = { email: `smoke-gps-mgr-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
-  const staff = { email: `smoke-gps-stf-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
+  const admin = { email: `smoke-gps-adm-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
+  const manager = { email: `smoke-gps-mgr-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
+  const staff = { email: `smoke-gps-stf-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
 
   gpsAdminId = seedConfirmedUser(admin, { full_name: 'Smoke GPS Admin' })
   gpsManagerId = seedConfirmedUser(manager, { full_name: 'Smoke GPS Manager' })
@@ -6558,8 +6610,8 @@ await check('a reporting agency exists with a manager and a member of staff', as
   rptOrg = orgA.id
   rptOwnerClient = clientA
 
-  const manager = { email: `smoke-rpt-mgr-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
-  const staff = { email: `smoke-rpt-stf-${STAMP}@atlasloca.com`, password: 'SmokeTest!2026' }
+  const manager = { email: `smoke-rpt-mgr-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
+  const staff = { email: `smoke-rpt-stf-${STAMP}@atlasloca.com`, password: SMOKE_PASSWORD }
   rptManagerId = seedConfirmedUser(manager, { full_name: 'Smoke Report Manager' })
   rptStaffId = seedConfirmedUser(staff, { full_name: 'Smoke Report Staff' })
 
@@ -7535,7 +7587,7 @@ let teamWithdrawnId, teamDoomedId, teamRacerId
 // removed at the end.
 // =============================================================================
 
-const teamPassword = 'SmokeTest!2026'
+const teamPassword = SMOKE_PASSWORD
 const teamEmail = (who) => `smoke-team-${who}-${STAMP}@atlasloca.com`
 
 let teamOrg, teamRivalOrg
@@ -9005,7 +9057,7 @@ await check('team teardown leaves nothing of its own behind', async () => {
 // member less than it tells an owner, and refuses a stranger entirely.
 // =============================================================================
 
-const notifyPassword = 'SmokeTest!2026'
+const notifyPassword = SMOKE_PASSWORD
 const notifyEmail = (who) => `smoke-notify-${who}-${STAMP}@atlasloca.com`
 const notifyRow = (out) => (out.result ?? out.rows ?? [])[0]
 
@@ -10137,7 +10189,7 @@ await check('notify teardown leaves nothing of its own behind', async () => {
 // and whether the billing surface can be reached by anybody it should not be.
 // =============================================================================
 
-const billingPassword = 'SmokeTest!2026'
+const billingPassword = SMOKE_PASSWORD
 const billingEmail = (who) => `smoke-billing-${who}-${STAMP}@atlasloca.com`
 const billingRow = (out) => (out.result ?? out.rows ?? [])[0]
 

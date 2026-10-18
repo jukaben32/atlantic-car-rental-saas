@@ -1,6 +1,7 @@
 import { detectImageType, signMediaUrl, signMediaUrls } from '@/features/vehicles/media'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { AppError, toAppError } from '@/lib/supabase/errors'
+import { SENSITIVE_FILE_CACHE_CONTROL } from '@/lib/supabase/storage'
 import type { RentalConditionPhoto } from '@/types/database'
 
 /**
@@ -79,9 +80,11 @@ export async function storeContractPdf(input: StoreContractPdfInput): Promise<st
   const supabase = getSupabaseClient()
   const path = contractKey(input.organizationId, input.rentalId, input.version)
 
-  const { error } = await supabase.storage
-    .from(RENTAL_BUCKET)
-    .upload(path, input.bytes, { contentType: 'application/pdf', upsert: false })
+  const { error } = await supabase.storage.from(RENTAL_BUCKET).upload(path, input.bytes, {
+    contentType: 'application/pdf',
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (error) throw toAppError(error)
 
@@ -116,9 +119,11 @@ export async function storeSignature(
   png: Blob,
 ): Promise<string> {
   const path = signatureKey(organizationId, rentalId)
-  const { error } = await getSupabaseClient()
-    .storage.from(RENTAL_BUCKET)
-    .upload(path, png, { contentType: 'image/png', upsert: false })
+  const { error } = await getSupabaseClient().storage.from(RENTAL_BUCKET).upload(path, png, {
+    contentType: 'image/png',
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (error) throw toAppError(error)
   return path
@@ -153,9 +158,11 @@ export async function uploadConditionPhoto(
   const supabase = getSupabaseClient()
   const path = conditionPhotoKey(input.organizationId, input.rentalId, input.phase, contentType)
 
-  const { error } = await supabase.storage
-    .from(RENTAL_BUCKET)
-    .upload(path, input.file, { contentType, upsert: false })
+  const { error } = await supabase.storage.from(RENTAL_BUCKET).upload(path, input.file, {
+    contentType,
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (error) throw toAppError(error)
 

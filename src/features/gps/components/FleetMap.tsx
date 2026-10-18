@@ -1,4 +1,4 @@
-import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl'
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import { MapPinOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils/cn'
 import type { GpsFleetRow, GpsPositionFreshness } from '@/types/database'
 
 import { boundsOf } from '../domain'
+
+import { maplibregl } from './maplibre'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -259,7 +261,7 @@ export function FleetMap({ rows, selectedVehicleId, onSelect, className }: Fleet
   // Data in.
   useEffect(() => {
     if (!ready || !map.current) return
-    map.current.getSource<GeoJSONSource>(SOURCE_ID)?.setData(collection)
+    void map.current.getSource<GeoJSONSource>(SOURCE_ID)?.setData(collection)
   }, [collection, ready])
 
   // Fit once per change in which vehicles are plotted.

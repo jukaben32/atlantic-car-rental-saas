@@ -2,6 +2,7 @@ import { sha256Hex } from '@/features/rentals/storage'
 import { detectImageType, signMediaUrl } from '@/features/vehicles/media'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { AppError, toAppError } from '@/lib/supabase/errors'
+import { SENSITIVE_FILE_CACHE_CONTROL } from '@/lib/supabase/storage'
 import type { FinancingDocument, FinancingDocumentKind } from '@/types/database'
 
 /**
@@ -88,9 +89,11 @@ export async function uploadFinancingDocument(
   const supabase = getSupabaseClient()
   const path = documentKey(input.organizationId, input.agreementId, contentType)
 
-  const { error } = await supabase.storage
-    .from(FINANCING_BUCKET)
-    .upload(path, input.file, { contentType, upsert: false })
+  const { error } = await supabase.storage.from(FINANCING_BUCKET).upload(path, input.file, {
+    contentType,
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (error) throw toAppError(error)
 

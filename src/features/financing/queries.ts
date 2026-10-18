@@ -330,12 +330,18 @@ export function useUpdateAgreementNotes(agreementId: string) {
   })
 }
 
-export function useActivateAgreement(agreementId: string) {
+/**
+ * Activates an agreement. A page that already shows one binds its id here; a
+ * page that has only just created one passes the new id to `mutateAsync`,
+ * because a hook bound to state set in the same handler would still see the
+ * value from before the render.
+ */
+export function useActivateAgreement(agreementId?: string) {
   const organization = useOrganization()
   const client = useQueryClient()
 
   return useMutation({
-    mutationFn: () => activateAgreement(agreementId),
+    mutationFn: (createdId: string | void) => activateAgreement(createdId || agreementId || ''),
     onSuccess: () => invalidateFinancing(client, organization.id),
   })
 }

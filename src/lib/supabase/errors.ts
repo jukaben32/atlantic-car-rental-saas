@@ -273,8 +273,19 @@ const SQLSTATE_MESSAGES: Readonly<Record<string, readonly [string, AppErrorKind]
   PGRST301: ['Your session has expired. Sign in again.', 'auth'],
 }
 
-/** Supabase Auth failures, matched on message because codes vary by provider. */
+/**
+ * Supabase Auth failures. Matched on the message and, where Auth sends one, the
+ * error code — some messages quote the address, so the code is the stable part.
+ */
 const AUTH_MESSAGES: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    /email_address_invalid|email address .* is invalid/i,
+    'That email address cannot be used. Check it for typos or use a different address.',
+  ],
+  [
+    /email_address_not_authorized|email address not authorized/i,
+    'Email cannot be sent to that address yet. Ask the administrator of this site to set up email delivery.',
+  ],
   [/invalid login credentials/i, 'That email and password combination is not recognised.'],
   [/email not confirmed/i, 'Confirm your email address first — check your inbox for the link.'],
   [
@@ -327,8 +338,9 @@ export function toAppError(error: unknown): AppError {
     if (pattern.test(raw)) return new AppError(kind, message, { code, cause: error })
   }
 
+  const authText = code ? `${error.message} ${code}` : error.message
   for (const [pattern, message] of AUTH_MESSAGES) {
-    if (pattern.test(error.message)) return new AppError('auth', message, { code, cause: error })
+    if (pattern.test(authText)) return new AppError('auth', message, { code, cause: error })
   }
 
   if (/row-level security/i.test(raw)) {

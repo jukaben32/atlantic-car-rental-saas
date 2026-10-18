@@ -2,6 +2,7 @@ import { detectImageType, signMediaUrl, signMediaUrls } from '@/features/vehicle
 import { sha256Hex } from '@/features/rentals/storage'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { AppError, toAppError } from '@/lib/supabase/errors'
+import { SENSITIVE_FILE_CACHE_CONTROL } from '@/lib/supabase/storage'
 import type { ExpenseAttachment, ExpenseDocumentKind } from '@/types/database'
 
 /**
@@ -85,9 +86,11 @@ export async function uploadReceipt(input: UploadReceiptInput): Promise<ExpenseA
   const supabase = getSupabaseClient()
   const path = receiptKey(input.organizationId, input.expenseId, contentType)
 
-  const { error } = await supabase.storage
-    .from(RECEIPT_BUCKET)
-    .upload(path, input.file, { contentType, upsert: false })
+  const { error } = await supabase.storage.from(RECEIPT_BUCKET).upload(path, input.file, {
+    contentType,
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (error) throw toAppError(error)
 

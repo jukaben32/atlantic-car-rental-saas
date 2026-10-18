@@ -1,4 +1,4 @@
-import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl'
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getBasemapConfiguration } from '@/lib/config/env'
@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils/cn'
 import type { GpsTrackPoint } from '@/types/database'
 
 import { boundsOf } from '../domain'
+
+import { maplibregl } from './maplibre'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -183,9 +185,9 @@ export function TrackMap({ points, className }: TrackMapProps) {
   useEffect(() => {
     if (!ready || !map.current) return
     const instance = map.current
-    instance.getSource<GeoJSONSource>(LINE_SOURCE)?.setData(geometry.line)
-    instance.getSource<GeoJSONSource>(POINT_SOURCE)?.setData(geometry.dots)
-    instance.getSource<GeoJSONSource>(ENDS_SOURCE)?.setData(geometry.ends)
+    void instance.getSource<GeoJSONSource>(LINE_SOURCE)?.setData(geometry.line)
+    void instance.getSource<GeoJSONSource>(POINT_SOURCE)?.setData(geometry.dots)
+    void instance.getSource<GeoJSONSource>(ENDS_SOURCE)?.setData(geometry.ends)
 
     const bounds = boundsOf(
       geometry.coordinates.map(([longitude, latitude]) => ({ longitude, latitude })),

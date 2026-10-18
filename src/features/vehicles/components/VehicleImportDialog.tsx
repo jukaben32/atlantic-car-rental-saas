@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
@@ -20,7 +20,7 @@ import {
   validateImportRows,
 } from '../csv'
 import { plateComparisonKey } from '../normalise'
-import { useVehicleList } from '../queries'
+import { useVehicleList, vehicleKeys } from '../queries'
 
 type Step = 'choose' | 'map' | 'result'
 
@@ -58,6 +58,7 @@ export function VehicleImportDialog(props: VehicleImportDialogProps) {
 
 function ImportDialogContent({ open, onOpenChange }: VehicleImportDialogProps) {
   const organization = useOrganization()
+  const client = useQueryClient()
   const toast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -152,9 +153,11 @@ function ImportDialogContent({ open, onOpenChange }: VehicleImportDialogProps) {
 
       return result
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setOutcome(result)
       setStep('result')
+      // The same subtree the Add vehicle form invalidates: list, counts and makes.
+      await client.invalidateQueries({ queryKey: vehicleKeys.all(organization.id) })
       if (result.imported > 0) {
         toast.success(
           `${result.imported} ${result.imported === 1 ? 'vehicle' : 'vehicles'} imported`,

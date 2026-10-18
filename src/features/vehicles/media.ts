@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { AppError, toAppError } from '@/lib/supabase/errors'
+import { SENSITIVE_FILE_CACHE_CONTROL } from '@/lib/supabase/storage'
 import type { VehicleImage } from '@/types/database'
 
 import { deleteVehicleDocument, updateVehicleDocument } from './api'
@@ -259,7 +260,11 @@ export async function uploadVehicleDocumentFile(input: UploadDocumentFileInput):
 
   const { error } = await getSupabaseClient()
     .storage.from(DOCUMENT_BUCKET)
-    .upload(path, input.file, { contentType, upsert: false })
+    .upload(path, input.file, {
+      contentType,
+      cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+      upsert: false,
+    })
 
   if (error) throw toAppError(error)
 

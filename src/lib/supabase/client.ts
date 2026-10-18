@@ -29,7 +29,7 @@ export function getSupabaseClient(): SupabaseClient<Database> {
   const result = getEnvironment()
   if (result.status !== 'ok') throw new SupabaseNotConfiguredError()
 
-  client = createClient<Database>(result.env.supabaseUrl, result.env.supabaseAnonKey, {
+  client = createClient<Database>(result.env.supabaseUrl, result.env.supabasePublishableKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,

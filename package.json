@@ -1,7 +1,7 @@
 {
   "name": "atlas-rental-saas",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Atlas — Car Rental Management SaaS by Profit Studio",
   "author": "Profit Studio (https://profitstudio.app)",
   "homepage": "https://profitstudio.app",
@@ -22,6 +22,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "setup:check": "node scripts/setup-check.mjs",
+    "setup:env": "node scripts/setup-env.mjs",
     "smoke:live": "node scripts/live-smoke-test.mjs"
   },
   "dependencies": {
@@ -33,7 +35,7 @@
     "@tanstack/react-query": "^5.101.4",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
-    "maplibre-gl": "^5.24.0",
+    "maplibre-gl": "^6.14.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.85.0",

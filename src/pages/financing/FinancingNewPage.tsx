@@ -91,8 +91,7 @@ export function FinancingNewPage() {
     return vehicle ? { ...base, vehicleId: vehicle } : base
   })
 
-  const [createdId, setCreatedId] = useState<string | null>(null)
-  const activate = useActivateAgreement(createdId ?? '')
+  const activate = useActivateAgreement()
 
   const patch = (next: Partial<AgreementFormInput>) =>
     setValues((current) => ({ ...current, ...next }))
@@ -161,12 +160,11 @@ export function FinancingNewPage() {
 
     try {
       const agreement = await create.mutateAsync(parsed.data)
-      setCreatedId(agreement.id)
 
       if (activateNow) {
         // Activation writes the schedule and flips the status in one
         // transaction, so an agreement is never live without its obligations.
-        await activate.mutateAsync()
+        await activate.mutateAsync(agreement.id)
         toast.success('Financing recorded', 'The payment schedule is ready.')
       } else {
         toast.success('Saved as a draft', 'Terms can still be corrected freely.')

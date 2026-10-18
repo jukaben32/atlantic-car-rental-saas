@@ -11,22 +11,24 @@ Supabase dashboard: if a table, policy or function exists, a file here created i
 2. **Link and push the schema:**
 
    ```bash
-   npm install -g supabase          # or: brew install supabase/tap/supabase
-   supabase login
-   supabase link --project-ref <your-project-ref>
-   supabase db push
+   npx supabase login               # the CLI is a dev dependency — no global install
+   npx supabase link --project-ref <your-project-ref>
+   npx supabase db push --dry-run   # review what will be applied
+   npx supabase db push
    ```
 
-   `db push` applies all 53 files in `migrations/`, in filename order, and records them in
+   A notice that Docker is not running is harmless here: Docker is only used by a local
+   database, and `db push` talks to your hosted project directly.
+
+   `db push` applies all 54 files in `migrations/`, in filename order, and records them in
    `supabase_migrations.schema_migrations`. Confirm everything landed with
-   `supabase migration list --linked` — every local migration should also show up remote,
+   `npx supabase migration list --linked` — every local migration should also show up remote,
    nothing pending on either side.
 
 3. **Deploy the Edge Functions:**
 
    ```bash
-   supabase functions deploy team-invitations gps-provider billing billing-webhook \
-     --project-ref <your-project-ref>
+   npx supabase functions deploy --project-ref <your-project-ref>
    ```
 
    All four deploy with no secrets set. Each one turns on a capability that is otherwise
@@ -35,8 +37,9 @@ Supabase dashboard: if a table, policy or function exists, a file here created i
    required for the base Free Build.
 
 4. **Set the two browser values** in `.env.local` (copied from
-   [.env.example](../.env.example)): `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`,
-   both from Project Settings → API. Nothing else is required for `npm run dev`.
+   [.env.example](../.env.example)): `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+   (Project Settings → Data API and → API Keys). Nothing else is required for `npm run dev`.
+   `npm run setup:check` confirms the values and that the CLI is linked to the same project.
 5. **Configure Auth** — see [Supabase project settings to check](#supabase-project-settings-to-check)
    below — then sign up.
 
@@ -44,9 +47,11 @@ Supabase dashboard: if a table, policy or function exists, a file here created i
 
 Only if the CLI is unavailable to you: open the dashboard → SQL Editor and run every file
 under `migrations/`, **in filename order, one at a time, confirming each succeeds before
-the next** — there are 53 of them, so this is slow. The migrations are written to be
-safely re-runnable (`if not exists`, `create or replace`, `drop policy if exists`), so a
-partial run can be resumed. Prefer `supabase db push` above.
+the next** — there are 54 of them, so this is slow. Each file runs as one transaction, so
+a failing file changes nothing and can be fixed and re-run. Files that already succeeded
+must **not** be run again: several are not safe to repeat. This route also records no
+migration history, so a later `db push` would try to re-apply everything — prefer
+`npx supabase db push` above, and never mix the two on one project.
 
 ## What each migration does
 

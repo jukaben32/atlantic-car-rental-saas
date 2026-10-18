@@ -15,14 +15,14 @@ License: MIT — see [LICENSE](./LICENSE).
 
 ## Required for the core application
 
-| What                     | Where it goes                             | Notes                                                                                        |
-| ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Build environment (inlined at build time) | Supabase → Project Settings → API → Project URL.                                             |
-| `VITE_SUPABASE_ANON_KEY` | Build environment (inlined at build time) | The anon / publishable key. The app refuses to start if a `service_role` key is pasted here. |
-| Database schema          | `supabase/migrations/`, applied in order  | `supabase db push`, or paste each file into the SQL editor. Nothing is created by hand.      |
-| Edge Functions           | `supabase functions deploy <name>`        | `team-invitations`, `gps-provider`, `billing`, `billing-webhook`.                            |
-| Auth redirect URLs       | Supabase → Auth → URL Configuration       | The application origin, plus `/accept-invite` and `/auth/reset-password`.                    |
-| Application base URL     | Wherever the static build is served       | `dist/` is a static SPA; `public/.htaccess` supplies the Apache/LiteSpeed rewrite.           |
+| What                            | Where it goes                             | Notes                                                                                                                                        |
+| ------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | Build environment (inlined at build time) | Supabase → Project Settings → API → Project URL.                                                                                             |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Build environment (inlined at build time) | The publishable key (`VITE_SUPABASE_ANON_KEY` is still accepted). The app refuses to start if a secret or `service_role` key is pasted here. |
+| Database schema                 | `supabase/migrations/`, applied in order  | `supabase db push`, or paste each file into the SQL editor. Nothing is created by hand.                                                      |
+| Edge Functions                  | `supabase functions deploy <name>`        | `team-invitations`, `gps-provider`, `billing`, `billing-webhook`.                                                                            |
+| Auth redirect URLs              | Supabase → Auth → URL Configuration       | The application origin, plus `/auth/callback`, `/accept-invite`, `/auth/reset-password` and `/confirm-email`.                                |
+| Application base URL            | Wherever the static build is served       | `dist/` is a static SPA; `public/.htaccess` supplies the Apache/LiteSpeed rewrite.                                                           |
 
 `VITE_APP_NAME` is optional and only names the product in the tab and the shell.
 

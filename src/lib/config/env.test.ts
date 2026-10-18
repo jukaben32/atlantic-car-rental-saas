@@ -63,7 +63,7 @@ describe('environment resolution', () => {
     if (result.status === 'invalid') {
       expect(result.problems.map((problem) => problem.variable)).toEqual([
         'VITE_SUPABASE_URL',
-        'VITE_SUPABASE_ANON_KEY',
+        'VITE_SUPABASE_PUBLISHABLE_KEY',
       ])
     }
   })
@@ -103,6 +103,60 @@ describe('environment resolution', () => {
         VITE_SUPABASE_ANON_KEY: ANON_KEY,
       }).status,
     ).toBe('ok')
+  })
+
+  it('accepts a publishable key under its current name', () => {
+    const result = resolveEnvironment({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_current',
+    })
+    expect(result.status === 'ok' && result.env.supabasePublishableKey).toBe(
+      'sb_publishable_current',
+    )
+  })
+
+  it('still accepts the older anon variable on its own', () => {
+    const result = resolveEnvironment({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_ANON_KEY: ANON_KEY,
+    })
+    expect(result.status === 'ok' && result.env.supabasePublishableKey).toBe(ANON_KEY)
+  })
+
+  it('prefers the publishable variable when both are set', () => {
+    const result = resolveEnvironment({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_current',
+      VITE_SUPABASE_ANON_KEY: ANON_KEY,
+    })
+    expect(result.status === 'ok' && result.env.supabasePublishableKey).toBe(
+      'sb_publishable_current',
+    )
+  })
+
+  it('refuses a secret key under the publishable name', () => {
+    const result = resolveEnvironment({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_should_never_ship',
+    })
+    expect(result.status).toBe('invalid')
+    if (result.status === 'invalid') {
+      expect(result.problems[0]?.variable).toBe('VITE_SUPABASE_PUBLISHABLE_KEY')
+    }
+  })
+
+  it('refuses a secret left under the old name even when the new one is valid', () => {
+    // Every VITE_ variable is compiled into the bundle, so the unused one would
+    // still reach the browser.
+    const result = resolveEnvironment({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_current',
+      VITE_SUPABASE_ANON_KEY: SERVICE_KEY,
+    })
+    expect(result.status).toBe('invalid')
+    if (result.status === 'invalid') {
+      expect(result.problems.map((problem) => problem.variable)).toEqual(['VITE_SUPABASE_ANON_KEY'])
+    }
   })
 
   it('ignores surrounding whitespace from a pasted value', () => {

@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { AppError, toAppError } from '@/lib/supabase/errors'
+import { SENSITIVE_FILE_CACHE_CONTROL } from '@/lib/supabase/storage'
 import type { CustomerDocument } from '@/types/database'
 
 import { updateCustomerDocument } from './api'
@@ -123,9 +124,11 @@ export async function uploadCustomerDocumentFile(
 
   const path = documentKey(input.organizationId, input.customerId, extensionFor(mimeType))
 
-  const upload = await supabase.storage
-    .from(CUSTOMER_DOCUMENT_BUCKET)
-    .upload(path, input.file, { contentType: mimeType, upsert: false })
+  const upload = await supabase.storage.from(CUSTOMER_DOCUMENT_BUCKET).upload(path, input.file, {
+    contentType: mimeType,
+    cacheControl: SENSITIVE_FILE_CACHE_CONTROL,
+    upsert: false,
+  })
 
   if (upload.error) throw toAppError(upload.error)
 

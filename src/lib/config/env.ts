@@ -10,7 +10,11 @@ import { PRODUCT_BRAND } from './brand'
 
 export interface AppEnvironment {
   readonly supabaseUrl: string
-  readonly supabaseAnonKey: string
+  /**
+   * The browser-safe Supabase key: `VITE_SUPABASE_PUBLISHABLE_KEY`, or the older
+   * `VITE_SUPABASE_ANON_KEY` name when only that one is set.
+   */
+  readonly supabasePublishableKey: string
   readonly appName: string
   /**
    * Style document for the fleet map's basemap, or null when none is configured.
@@ -111,7 +115,12 @@ export function resolveEnvironment(
   const problems: EnvironmentProblem[] = []
 
   const supabaseUrl = readVariable(source, 'VITE_SUPABASE_URL')
-  const supabaseAnonKey = readVariable(source, 'VITE_SUPABASE_ANON_KEY')
+
+  // The publishable key goes by its current name; the anon name still works so
+  // existing deployments keep running. The current name wins when both are set.
+  const publishableKey = readVariable(source, 'VITE_SUPABASE_PUBLISHABLE_KEY')
+  const legacyKey = readVariable(source, 'VITE_SUPABASE_ANON_KEY')
+  const supabasePublishableKey = publishableKey || legacyKey
 
   if (!supabaseUrl) {
     problems.push({
@@ -139,17 +148,27 @@ export function resolveEnvironment(
     }
   }
 
-  if (!supabaseAnonKey) {
+  if (!supabasePublishableKey) {
     problems.push({
-      variable: 'VITE_SUPABASE_ANON_KEY',
-      detail: 'Missing. Copy the anon / publishable key from Supabase → Project Settings → API.',
+      variable: 'VITE_SUPABASE_PUBLISHABLE_KEY',
+      detail: 'Missing. Copy the publishable key from Supabase → Project Settings → API Keys.',
     })
-  } else if (isPrivilegedKey(supabaseAnonKey)) {
-    problems.push({
-      variable: 'VITE_SUPABASE_ANON_KEY',
-      detail:
-        'This is a service_role key. It bypasses Row Level Security and must never be exposed to a browser. Use the anon / publishable key instead.',
-    })
+  }
+
+  // Both names are checked, not just the one in use: every VITE_ variable is
+  // compiled into the browser bundle, so a secret left under the old name would
+  // ship even while the new one is correct.
+  for (const [variable, value] of [
+    ['VITE_SUPABASE_PUBLISHABLE_KEY', publishableKey],
+    ['VITE_SUPABASE_ANON_KEY', legacyKey],
+  ] as const) {
+    if (value && isPrivilegedKey(value)) {
+      problems.push({
+        variable,
+        detail:
+          'This is a secret (service_role or sb_secret_) key. It bypasses Row Level Security and must never be exposed to a browser. Use the publishable key instead.',
+      })
+    }
   }
 
   const mapStyleUrl = readVariable(source, 'VITE_MAP_STYLE_URL')
@@ -184,7 +203,7 @@ export function resolveEnvironment(
     status: 'ok',
     env: {
       supabaseUrl,
-      supabaseAnonKey,
+      supabasePublishableKey,
       appName: readVariable(source, 'VITE_APP_NAME') || DEFAULT_APP_NAME,
       mapStyleUrl: mapStyleUrl || null,
       mapAttribution: readVariable(source, 'VITE_MAP_ATTRIBUTION') || null,

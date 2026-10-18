@@ -19,6 +19,22 @@ The base **Free Build** needs only a Supabase project. Stripe, Wialon and an inv
 email provider are all optional — nothing below requires any of them; see
 [Edge Function secrets](#edge-function-secrets).
 
+### Guided setup with Claude
+
+Open this folder in Claude Code (the Code tab of Claude Desktop, or the VS Code
+extension) and ask:
+
+> Set up Atlas for me.
+
+Claude follows the [`atlas-setup`](.claude/skills/atlas-setup/SKILL.md) skill: it checks your
+computer, connects **your own** Supabase project, applies the database, configures the app,
+helps you create your first agency, then publishes to your own GitHub repository and walks
+you through deploying on Hostinger. It runs the commands; you sign in, click in dashboards,
+and approve every step that changes something outside this folder. `npm run setup:check`
+shows where the folder stands at any time.
+
+### Manual setup
+
 ```bash
 git clone https://github.com/salhiworks/atlas-car-rental-saas.git
 cd atlas-car-rental-saas
@@ -29,11 +45,11 @@ Create a Supabase project (dashboard → New project), then set up the database 
 Functions — see [`supabase/README.md`](supabase/README.md) for the full walkthrough:
 
 ```bash
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase db push
-supabase functions deploy team-invitations gps-provider billing billing-webhook \
-  --project-ref <your-project-ref>
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push --dry-run   # review, then:
+npx supabase db push
+npx supabase functions deploy --project-ref <your-project-ref>
 ```
 
 Neither command needs Docker or the local Supabase stack: both push directly to your
@@ -62,16 +78,18 @@ the missing variables. That is deliberate — see [Configuration](#configuration
 
 ### Scripts
 
-| Command              | What it does                                                 |
-| -------------------- | ------------------------------------------------------------ |
-| `npm run dev`        | Vite dev server on http://localhost:5173                     |
-| `npm run build`      | Type-check, then build to `dist/`                            |
-| `npm run preview`    | Serve the production build locally                           |
-| `npm run typecheck`  | TypeScript across app, config and tests                      |
-| `npm run lint`       | ESLint with type-aware rules                                 |
-| `npm run test`       | Vitest — unit tests and the database schema suite            |
-| `npm run verify`     | format → lint → typecheck → test → build. Run before merging |
-| `npm run smoke:live` | Live checks against the linked Supabase project (see below)  |
+| Command                      | What it does                                                     |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `npm run dev`                | Vite dev server on http://localhost:5173                         |
+| `npm run build`              | Type-check, then build to `dist/`                                |
+| `npm run preview`            | Serve the production build locally                               |
+| `npm run typecheck`          | TypeScript across app, config and tests                          |
+| `npm run lint`               | ESLint with type-aware rules                                     |
+| `npm run test`               | Vitest — unit tests and the database schema suite                |
+| `npm run verify`             | format → lint → typecheck → test → build. Run before merging     |
+| `npm run setup:check`        | Read-only checklist of tools, configuration and Git remotes      |
+| `npm run setup:env -- <ref>` | Write `.env.local` for a Supabase project (publishable key only) |
+| `npm run smoke:live`         | Live checks against the linked Supabase project (see below)      |
 
 ---
 
@@ -79,13 +97,28 @@ the missing variables. That is deliberate — see [Configuration](#configuration
 
 Two variables, both public by definition since they ship in the browser bundle:
 
-| Variable                 | Where it comes from                                    |
-| ------------------------ | ------------------------------------------------------ |
-| `VITE_SUPABASE_URL`      | Supabase → Project Settings → API → Project URL        |
-| `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → anon / publishable |
-| `VITE_APP_NAME`          | Optional. Product name in the tab and shell.           |
+| Variable                        | Where it comes from                                  |
+| ------------------------------- | ---------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | Supabase → Project Settings → Data API → Project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → Publishable |
 
-**Never put the `service_role` key here.** It bypasses Row Level Security entirely and
+`VITE_SUPABASE_ANON_KEY` is still accepted as the older name for the same value, so existing
+deployments keep working. When both are set, `VITE_SUPABASE_PUBLISHABLE_KEY` wins.
+
+### Optional configuration
+
+Not needed to run Atlas, and deliberately left out of `.env.example` so hosting panels that
+read it only suggest the two required values. Add any of these to `.env.local` and to your
+host's environment variables only if you want them:
+
+| Variable                | What it does                                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_APP_NAME`         | Product name in the browser tab and shell. Defaults to `src/lib/config/brand.ts`.                                           |
+| `VITE_MAP_STYLE_URL`    | An https MapLibre style you are licensed to use. Without it the fleet map still plots every vehicle, on a plain background. |
+| `VITE_MAP_ATTRIBUTION`  | The attribution text that map licence requires.                                                                             |
+| `VITE_STRIPE_GUIDE_URL` | An https link that replaces the Stripe setup guide the Billing page points to.                                              |
+
+**Never put a secret (`sb_secret_…`) or `service_role` key here.** It bypasses Row Level Security entirely and
 would hand every tenant's data to anyone who opens developer tools. The application
 decodes the key at startup and refuses to run if a privileged key is detected
 (`src/lib/config/env.ts`, covered by `env.test.ts`).
@@ -140,7 +173,7 @@ invitation after confirming their address rather than to the generic callback.
 
 ## Applying the database schema
 
-The schema lives in `supabase/migrations/` and is the source of truth — 53 files, applied
+The schema lives in `supabase/migrations/` and is the source of truth — 54 files, applied
 in order by `supabase db push`. See [`supabase/README.md`](supabase/README.md) for the
 full setup walkthrough, including the (much slower) SQL-editor fallback for when the CLI
 isn't available.
@@ -298,7 +331,17 @@ the interface only ever offers bookings the database will accept.
 
 ## Deployment
 
-`npm run build` produces a static `dist/`. Upload its contents to the Hostinger web root.
+`npm run build` produces a static `dist/`. The tested route is a Hostinger **Web App**
+deployed from your own GitHub repository, which rebuilds on every push:
+
+1. hPanel → **Websites → Add Website → Web App → Import Git Repository**; connect GitHub
+   (grant access to only your Atlas repository) and choose branch `main`.
+2. Node.js **22**, build command **`npm run build`**, output directory **`dist`**.
+3. Environment variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` — nothing else
+   is required.
+4. After the first deploy, add the live address to Supabase → Authentication → URL
+   Configuration: Site URL `https://<domain>` plus `/auth/callback`, `/accept-invite`,
+   `/auth/reset-password` and `/confirm-email` as Redirect URLs.
 
 `public/.htaccess` is copied into the build and handles the three things a static SPA
 needs on Apache/LiteSpeed: rewriting unknown paths to `index.html` so a refresh on
@@ -333,7 +376,7 @@ matters: without them the harness proves boundaries that do not exist on the rea
 ### Live smoke test
 
 ```bash
-npm run smoke:live      # requires a linked project and .env.local
+SMOKE_TARGET_PROJECT_REF=<test-project-ref> npm run smoke:live
 ```
 
 418 checks against the linked Supabase project, covering what a local harness structurally
@@ -341,6 +384,12 @@ cannot: PostgREST's query builder (the `.or()` search, view pagination, ordering
 count), Storage upload and signed-URL retrieval, GoTrue sign-in, and cross-tenant refusal
 of real signed URLs. It creates data prefixed `Smoke Test` and removes all of it, including
 uploaded objects, at the end.
+
+**Developers only, and only against a disposable project.** The suite inserts users
+directly into `auth.users`, creates and deletes agencies, and clears orphaned GPS secrets
+from Vault. It refuses to start unless `SMOKE_TARGET_PROJECT_REF` is set and matches both
+the project in `.env.local` and the project the CLI is linked to. Test users get a random
+password generated for that run, which is never printed.
 
 ## License
 
