@@ -54,3 +54,23 @@ export declare function pickBrowserKey(
   apiKeys: unknown,
 ): { kind: 'publishable' | 'legacy-anon'; value: string } | null
 export declare function envFileContents(projectRef: string, key: string): string
+
+export declare const SITE_ROUTES: readonly string[]
+
+export interface SiteFacts {
+  origin: string
+  expectedRef: string | null
+  rootStatus: number | null
+  hsts: boolean
+  routes: { path: string; status: number | null; html: boolean }[]
+  bundleFiles: number
+  refs: string[]
+  keyFound: boolean | null
+  secretFound: boolean
+}
+
+export declare function siteOrigin(value: string | undefined): string | null
+export declare function bundleAssetUrls(html: string, origin: string): string[]
+export declare function supabaseRefsIn(text: string): string[]
+export declare function containsSecretKey(text: string): boolean
+export declare function evaluateSite(facts: SiteFacts): CheckResult[]

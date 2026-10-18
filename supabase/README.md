@@ -77,13 +77,13 @@ migration history, so a later `db push` would try to re-apply everything — pre
 
 Applying the SQL is not quite everything. In the dashboard:
 
-- **Authentication → URL Configuration.** Set _Site URL_ to your app's origin —
-  `http://localhost:5173` while developing locally (Vite's default port; see the note
-  below if something else is already using it), your real domain once deployed — and add
-  `<origin>/auth/callback`, `<origin>/accept-invite`, `<origin>/auth/reset-password` and
-  `<origin>/confirm-email` to _Redirect URLs_. Confirmation and password-reset links will
-  not work until you do, and the **production** domain needs to be added here too before
-  you rely on them there — the local entries do not carry over automatically.
+- **Authentication → URL Configuration.** Set _Site URL_ to your deployed app's origin
+  (`https://<your-domain>`) and add `<origin>/auth/callback`, `<origin>/accept-invite`,
+  `<origin>/auth/reset-password` and `<origin>/confirm-email` to _Redirect URLs_.
+  Confirmation and password-reset links will not work until you do, so do this after the
+  first deploy and before the first sign-up. Developing locally as well? Add the same four
+  paths for `http://localhost:5173` (Vite's default port; see the note below if something
+  else is already using it) — each origin needs its own entries.
 
   `supabase/config.toml` ships an `[auth]` section, but it configures the _local_
   Supabase stack (`supabase start`) only. Do not run `supabase config push` expecting it

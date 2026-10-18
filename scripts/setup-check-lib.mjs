@@ -283,3 +283,176 @@ export function envFileContents(projectRef, key) {
 export function isReady(results) {
   return results.every((result) => result.status !== 'fail')
 }
+
+// Live site ---------------------------------------------------------------------
+//
+// The decisions behind `npm run setup:site`, which checks a deployed Atlas after
+// the Hostinger build. Like the rest of this module it never returns a key's
+// value.
+
+/** Paths a deployed Atlas must serve: sign-up, the four Auth redirects, and a deep link. */
+export const SITE_ROUTES = [
+  '/',
+  '/sign-up',
+  '/auth/callback',
+  '/confirm-email',
+  '/accept-invite',
+  '/auth/reset-password',
+  '/settings',
+]
+
+function isLocalHost(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+}
+
+/**
+ * The origin of a site address as a user pastes it ("my-site.com",
+ * "https://my-site.com/settings"), or null. Only https is accepted, except for
+ * a local address used to rehearse the check against `npm run preview`.
+ */
+export function siteOrigin(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`)
+    if (url.protocol === 'https:') return url.origin
+    if (url.protocol === 'http:' && isLocalHost(url.hostname)) return url.origin
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** Same-origin module scripts and modulepreloads named in index.html. */
+export function bundleAssetUrls(html, origin) {
+  const urls = new Set()
+  const tags = String(html ?? '').match(/<(script|link)\b[^>]*>/gi) ?? []
+  for (const tag of tags) {
+    const isScript = /^<script/i.test(tag)
+    if (!isScript && !/\brel=["']?modulepreload/i.test(tag)) continue
+    const match = (isScript ? /\bsrc=["']([^"']+)["']/i : /\bhref=["']([^"']+)["']/i).exec(tag)
+    if (!match) continue
+    try {
+      const url = new URL(match[1], origin)
+      if (url.origin === origin) urls.add(url.toString())
+    } catch {
+      // Not a URL; ignore it.
+    }
+  }
+  return [...urls]
+}
+
+/** Every Supabase project ref a bundle points at. */
+export function supabaseRefsIn(text) {
+  const refs = new Set()
+  for (const match of String(text ?? '').matchAll(/https:\/\/([a-z0-9]{20})\.supabase\.co/g)) {
+    refs.add(match[1])
+  }
+  return [...refs]
+}
+
+/** True when a bundle contains something that must never reach a browser. */
+export function containsSecretKey(text) {
+  const source = String(text ?? '')
+  if (/sb_secret_[A-Za-z0-9_-]{8,}/.test(source)) return true
+  for (const match of source.matchAll(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g)) {
+    if (classifyKey(match[0]) === 'secret') return true
+  }
+  return false
+}
+
+/**
+ * Turns what was fetched from a deployed site into a checklist, in the same
+ * { id, status, message } shape as `evaluate`.
+ *
+ * facts: { origin, expectedRef, rootStatus, hsts, routes: [{ path, status, html }],
+ *          bundleFiles, refs, keyFound (boolean | null), secretFound }
+ */
+export function evaluateSite(facts) {
+  const results = []
+  const add = (id, status, message) => results.push({ id, status, message })
+  const local = isLocalHost(new URL(facts.origin).hostname)
+
+  if (facts.rootStatus !== 200) {
+    add(
+      'reachable',
+      'fail',
+      `${facts.origin} answered ${facts.rootStatus ?? 'nothing'}. The deploy may still be running, or the address is wrong.`,
+    )
+    return results
+  }
+  add('reachable', 'ok', `${facts.origin} is online`)
+
+  if (local) {
+    add('https', 'ok', 'Local rehearsal (HTTPS is checked on the live address)')
+  } else if (facts.hsts) {
+    add('https', 'ok', 'Served over HTTPS with Atlas security headers')
+  } else {
+    add(
+      'https',
+      'warn',
+      'No Strict-Transport-Security header. public/.htaccess may not be in the deployed build — check the output directory is dist.',
+    )
+  }
+
+  const broken = (facts.routes ?? []).filter((route) => route.status !== 200 || !route.html)
+  if (broken.length > 0) {
+    add(
+      'routes',
+      'fail',
+      `These pages do not load: ${broken.map((route) => `${route.path} (${route.status ?? 'no answer'})`).join(', ')}. The output directory must be dist, so that .htaccess sends every page to the app.`,
+    )
+  } else {
+    add(
+      'routes',
+      'ok',
+      `Sign-up, the four sign-in links and deep links all load (${facts.routes.length} pages)`,
+    )
+  }
+
+  if (!facts.bundleFiles) {
+    add('config', 'fail', 'The page does not load the Atlas application script.')
+    return results
+  }
+
+  const refs = facts.refs ?? []
+  if (refs.length === 0) {
+    add(
+      'config',
+      'fail',
+      'The build has no Supabase address. VITE_SUPABASE_URL was missing when Hostinger built it — add it and redeploy.',
+    )
+  } else if (refs.length > 1 || (facts.expectedRef && refs[0] !== facts.expectedRef)) {
+    add(
+      'config',
+      'fail',
+      `The build points at ${refs.join(', ')}, not ${facts.expectedRef ?? 'the confirmed project'}. Fix VITE_SUPABASE_URL in Hostinger and redeploy.`,
+    )
+  } else {
+    add('config', 'ok', `The build uses Supabase project ${refs[0]}`)
+  }
+
+  if (facts.secretFound) {
+    add(
+      'key',
+      'fail',
+      'The build contains a SECRET key. Replace it with the publishable key in Hostinger, redeploy, and rotate the secret key in Supabase.',
+    )
+  } else if (facts.keyFound === false) {
+    add(
+      'key',
+      'fail',
+      'The build does not contain the publishable key from .env.local. Fix VITE_SUPABASE_PUBLISHABLE_KEY in Hostinger and redeploy.',
+    )
+  } else if (facts.keyFound === null) {
+    add(
+      'key',
+      'warn',
+      'No .env.local to compare the key with; only checked that no secret key is present.',
+    )
+  } else {
+    add('key', 'ok', 'The build uses the publishable key, and no secret key')
+  }
+
+  return results
+}

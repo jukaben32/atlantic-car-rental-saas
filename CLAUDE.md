@@ -7,14 +7,18 @@ build from `dist/`.
 ## Setting Atlas up
 
 When someone asks to install, set up, connect, publish or deploy Atlas, follow the
-**atlas-setup** skill (`.claude/skills/atlas-setup/SKILL.md`). It is agent-led: you do every
-safe step yourself and keep going without "continue?" questions. You stop only when the user
-must act in their own accounts (Supabase, GitHub, Hostinger, their first sign-up) or approve a
-change outside this folder. Then you ask once, and one approval covers everything it named.
-Don't hand out manual testing. Keep Atlas's default name, logo and colours unless asked.
+**atlas-setup** skill (`.claude/skills/atlas-setup/SKILL.md`). It is deployment-first and
+agent-led. Supabase comes first, then their own GitHub repository, then Hostinger. Sign-in
+settings use the live address, and the first agency is created on the live site; setup never
+runs Atlas on localhost. You do every safe step yourself and keep going without "continue?"
+questions. You stop only when the user must act in their own accounts or approve a change
+outside this folder. Then you ask once, naming the exact destination and operations, and that
+approval covers them. Don't hand out manual testing. Keep Atlas's default name, logo and
+colours unless asked.
 
 `npm run setup:check` is a read-only checklist of where the folder stands. Run it at the
-start of a session and between stages.
+start of a session and between stages. `npm run setup:site -- <domain>` checks a deployed
+site, read-only.
 
 ## Rules that always apply
 

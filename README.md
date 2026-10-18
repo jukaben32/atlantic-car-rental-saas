@@ -26,14 +26,21 @@ extension) and ask:
 
 > Set up Atlas for me.
 
-Claude follows the [`atlas-setup`](.claude/skills/atlas-setup/SKILL.md) skill: it checks your
-computer, connects **your own** Supabase project, applies the database, configures the app,
-helps you create your first agency, then publishes to your own GitHub repository and walks
-you through deploying on Hostinger. It runs the commands; you sign in, click in dashboards,
-and approve every step that changes something outside this folder. `npm run setup:check`
-shows where the folder stands at any time.
+Claude follows the [`atlas-setup`](.claude/skills/atlas-setup/SKILL.md) skill, which is
+**deployment-first**: Atlas goes straight to your own website, without running on your
+computer. Claude checks your computer, installs the database and Edge Functions into **your
+own** new Supabase project, publishes the code to your own private GitHub repository, then
+walks you through deploying it as a Hostinger **Web App**. Once the site is live you add its
+address to Supabase's sign-in settings and create your first agency on it. Claude runs the
+commands and checks every step; you sign in, click in dashboards, and approve each change
+outside this folder.
 
-### Manual setup
+You need: Node.js, Git, and accounts with Supabase, GitHub and Hostinger (a plan that can
+deploy a Web App from Git). `npm run setup:check` shows where the folder stands at any time.
+
+### Manual setup (developers)
+
+For working on Atlas on your own computer. The guided setup above does not need any of this.
 
 ```bash
 git clone https://github.com/salhiworks/atlas-car-rental-saas.git
@@ -78,18 +85,19 @@ the missing variables. That is deliberate — see [Configuration](#configuration
 
 ### Scripts
 
-| Command                      | What it does                                                     |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`                | Vite dev server on http://localhost:5173                         |
-| `npm run build`              | Type-check, then build to `dist/`                                |
-| `npm run preview`            | Serve the production build locally                               |
-| `npm run typecheck`          | TypeScript across app, config and tests                          |
-| `npm run lint`               | ESLint with type-aware rules                                     |
-| `npm run test`               | Vitest — unit tests and the database schema suite                |
-| `npm run verify`             | format → lint → typecheck → test → build. Run before merging     |
-| `npm run setup:check`        | Read-only checklist of tools, configuration and Git remotes      |
-| `npm run setup:env -- <ref>` | Write `.env.local` for a Supabase project (publishable key only) |
-| `npm run smoke:live`         | Live checks against the linked Supabase project (see below)      |
+| Command                          | What it does                                                     |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `npm run dev`                    | Vite dev server on http://localhost:5173                         |
+| `npm run build`                  | Type-check, then build to `dist/`                                |
+| `npm run preview`                | Serve the production build locally                               |
+| `npm run typecheck`              | TypeScript across app, config and tests                          |
+| `npm run lint`                   | ESLint with type-aware rules                                     |
+| `npm run test`                   | Vitest — unit tests and the database schema suite                |
+| `npm run verify`                 | format → lint → typecheck → test → build. Run before merging     |
+| `npm run setup:check`            | Read-only checklist of tools, configuration and Git remotes      |
+| `npm run setup:env -- <ref>`     | Write `.env.local` for a Supabase project (publishable key only) |
+| `npm run setup:site -- <domain>` | Read-only check of a deployed site: pages, Supabase project, key |
+| `npm run smoke:live`             | Live checks against the linked Supabase project (see below)      |
 
 ---
 
@@ -339,9 +347,11 @@ deployed from your own GitHub repository, which rebuilds on every push:
 2. Node.js **22**, build command **`npm run build`**, output directory **`dist`**.
 3. Environment variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` — nothing else
    is required.
-4. After the first deploy, add the live address to Supabase → Authentication → URL
+4. After the first deploy, `npm run setup:site -- <domain>` confirms the site loads and points
+   at your Supabase project. Then add the live address to Supabase → Authentication → URL
    Configuration: Site URL `https://<domain>` plus `/auth/callback`, `/accept-invite`,
    `/auth/reset-password` and `/confirm-email` as Redirect URLs.
+5. Open `https://<domain>/sign-up` and create your agency — that account is its Owner.
 
 `public/.htaccess` is copied into the build and handles the three things a static SPA
 needs on Apache/LiteSpeed: rewriting unknown paths to `index.html` so a refresh on
