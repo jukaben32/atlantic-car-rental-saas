@@ -44,6 +44,7 @@ import {
   PaymentStatusBadge,
   RentalStatusBadge,
 } from '@/features/rentals/components/RentalBadges'
+import { RentalWhatsAppMenu } from '@/features/rentals/components/RentalWhatsAppMenu'
 import { SubstituteVehicleDialog } from '@/features/rentals/components/SubstituteVehicleDialog'
 import {
   ACTION_LABELS,
@@ -231,6 +232,19 @@ export function RentalDetailPage() {
         description={RENTAL_STATUS_DESCRIPTIONS[rental.status]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {board ? (
+              <RentalWhatsAppMenu
+                customerId={board.customer_id}
+                customerName={board.customer_name}
+                reference={rental.reference}
+                startsAt={rental.starts_at}
+                endsAt={rental.ends_at}
+                currency={rental.currency}
+                totalMinor={quote.totalMinor}
+                balanceDueMinor={rental.balance_due_minor}
+              />
+            ) : null}
+
             {canUpdate && next ? (
               <Button
                 variant="primary"

@@ -474,6 +474,8 @@ export function TeamPage() {
         roleLabel={manualLink?.roleLabel ?? ''}
         email={manualLink?.email ?? null}
         detail={manualLink?.detail ?? null}
+        agencyName={organization.name}
+        locale={organization.locale}
         onClose={() => {
           setManualLink(null)
           // Nothing keeps a copy: the mutation cache held the resolved value,

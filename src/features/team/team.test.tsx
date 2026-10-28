@@ -445,6 +445,8 @@ describe('the one-time link', () => {
         roleLabel="Manager"
         email="new@agency.test"
         detail="No email provider is configured for this project."
+        agencyName="Atlantic Car Rental"
+        locale="es-DO"
         onClose={vi.fn()}
       />,
     )
@@ -454,6 +456,29 @@ describe('the one-time link', () => {
     expect(screen.getByText('https://app.test/accept-invite#token=abc')).toBeInTheDocument()
   })
 
+  it('offers WhatsApp with no recipient, so the administrator chooses the chat', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    render(
+      <ManualLinkDialog
+        link="https://app.test/accept-invite#token=abc"
+        roleLabel="Manager"
+        email={null}
+        detail={null}
+        agencyName="Atlantic Car Rental"
+        locale="es-DO"
+        onClose={vi.fn()}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /Send on WhatsApp/ }))
+
+    const url = String(open.mock.calls[0]?.[0])
+    expect(url.startsWith('https://wa.me/?text=')).toBe(true)
+    expect(decodeURIComponent(url)).toContain('Atlantic Car Rental')
+    expect(decodeURIComponent(url)).toContain('https://app.test/accept-invite#token=abc')
+    open.mockRestore()
+  })
+
   it('is closed when there is no link, so nothing lingers on screen', () => {
     render(
       <ManualLinkDialog
@@ -461,6 +486,8 @@ describe('the one-time link', () => {
         roleLabel="Manager"
         email={null}
         detail={null}
+        agencyName="Atlantic Car Rental"
+        locale="es-DO"
         onClose={vi.fn()}
       />,
     )

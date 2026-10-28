@@ -1,7 +1,8 @@
-import { Check, Copy, KeyRound } from 'lucide-react'
+import { Check, Copy, KeyRound, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 
 import { Alert, Button, Dialog, DialogContent } from '@/components/ui'
+import { invitationMessage, messageLanguage, whatsAppUrl } from '@/lib/whatsapp/whatsapp'
 
 /**
  * The one-time invitation link, when no email carried it.
@@ -24,6 +25,9 @@ export interface ManualLinkDialogProps {
   roleLabel: string
   email: string | null
   detail: string | null
+  /** For the WhatsApp message that carries the link. */
+  agencyName: string
+  locale: string
   onClose: () => void
 }
 
@@ -32,6 +36,8 @@ export function ManualLinkDialog({
   roleLabel,
   email,
   detail,
+  agencyName,
+  locale,
   onClose,
 }: ManualLinkDialogProps) {
   const [copied, setCopied] = useState(false)
@@ -45,6 +51,14 @@ export function ManualLinkDialog({
       // Clipboard access can be refused. The link is on screen and selectable.
       setCopied(false)
     }
+  }
+
+  // WhatsApp opens with no recipient: the invitee's phone is not known here, so
+  // the administrator picks the chat. The link still goes only where they send it.
+  const shareOnWhatsApp = () => {
+    if (!link) return
+    const text = invitationMessage(messageLanguage(locale), agencyName, roleLabel, link)
+    window.open(whatsAppUrl(null, text), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -92,6 +106,10 @@ export function ManualLinkDialog({
                 <Copy className="size-4" aria-hidden="true" /> Copy link
               </>
             )}
+          </Button>
+
+          <Button variant="secondary" onClick={shareOnWhatsApp} fullWidth>
+            <MessageCircle className="size-4" aria-hidden="true" /> Send on WhatsApp
           </Button>
         </div>
       </DialogContent>
