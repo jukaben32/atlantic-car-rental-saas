@@ -143,16 +143,32 @@ describe('nothing in the schema can bypass RLS', () => {
      * definer function here that WRITES a billing row from a browser: every
      * write lives in `app`, granted to service_role alone, and a separate
      * assertion in the migration fails the deploy if `authenticated` can reach
-     * one.
+     * one. The thirteen other billing_* entries are thin forwarders to those `app`
+     * functions, granted to service_role alone, because PostgREST's rpc() — which
+     * is how the billing Edge Functions reach the database — only sees `public`.
+     * They are the same pattern as the GPS service functions above.
      *
      * Anything else appearing in this list is a leak.
      */
     expect(definerFunctions.map((row) => row.proname).sort()).toEqual([
       'accept_team_invitation',
       'billing_access',
+      'billing_apply_invoice',
+      'billing_apply_subscription',
       'billing_available_plans',
+      'billing_claim_customer',
+      'billing_claim_webhook_event',
+      'billing_fail_webhook_event',
+      'billing_finish_webhook_event',
       'billing_history',
+      'billing_mark_customer_deleted',
+      'billing_note_event',
+      'billing_open_checkout',
       'billing_overview',
+      'billing_record_checkout',
+      'billing_replace_catalogue',
+      'billing_report_platform_state',
+      'billing_resolve_plan',
       'billing_set_email',
       'change_team_member_role',
       'create_organization',
@@ -290,9 +306,7 @@ describe('agency A cannot obtain agency B analytics', () => {
 
   it('scopes an unfiltered availability query to the caller', async () => {
     const rows = await db.asUser(agencyA.userId, (session) =>
-      session.sql<{ organization_id: string }>(
-        `select organization_id from public.vehicle_fleet`,
-      ),
+      session.sql<{ organization_id: string }>(`select organization_id from public.vehicle_fleet`),
     )
 
     expect(rows.length).toBeGreaterThan(0)
